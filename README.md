@@ -1,5 +1,8 @@
-# golang-countdown
-Server countdown written on Golang.
+# golang-timer
+
+## Features:
+- pause
+- resume
 
 ## Package was created to be used along with frontend application across websockets.
 
