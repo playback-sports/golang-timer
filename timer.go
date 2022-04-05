@@ -1,6 +1,7 @@
 package timer
 
 import (
+	"log"
 	"time"
 )
 
@@ -22,6 +23,7 @@ type Timer struct {
 	started  bool
 	done     bool
 	paused   bool
+	clearRun chan bool
 	passed   time.Duration
 	lastTick time.Time
 }
@@ -53,30 +55,43 @@ func (c *Timer) Run() {
 		c.options.OnRun(false)
 	}
 	c.options.OnTick()
-	for tickAt := range c.ticker.C {
-		c.passed += tickAt.Sub(c.lastTick)
-		c.lastTick = time.Now()
-		c.options.OnTick()
-		if c.Remaining() <= 0 {
-			c.ticker.Stop()
-			c.options.OnDone(false)
-			c.done = true
-		} else if c.Remaining() <= c.options.TickerInternal {
-			c.ticker.Stop()
-			time.Sleep(c.Remaining())
-			c.passed = c.options.Duration
+	for {
+		select {
+		case tickAt := <-c.ticker.C:
+			c.passed += tickAt.Sub(c.lastTick)
+			c.lastTick = time.Now()
 			c.options.OnTick()
-			c.options.OnDone(false)
-			c.done = true
+			if c.Remaining() <= 0 {
+				c.ticker.Stop()
+				c.options.OnDone(false)
+				c.done = true
+				return
+			} else if c.Remaining() <= c.options.TickerInternal {
+				c.ticker.Stop()
+				time.Sleep(c.Remaining())
+				c.passed = c.options.Duration
+				c.options.OnTick()
+				c.options.OnDone(false)
+				c.done = true
+				return
+			}
+		case <-c.clearRun:
+			log.Printf("channel paused\n")
+			return
 		}
 	}
 }
 
 // Pause temporarily pauses active timer.
 func (c *Timer) Pause() {
+	if c.paused {
+		return
+	}
+
 	c.ticker.Stop()
 	c.passed += time.Now().Sub(c.lastTick)
 	c.lastTick = time.Now()
+	c.clearRun <- true
 	c.paused = true
 	c.options.OnPaused()
 }
@@ -89,6 +104,7 @@ func (c *Timer) Paused() bool {
 // Stop finishes the timer.
 func (c *Timer) Stop() {
 	c.ticker.Stop()
+	c.clearRun <- true
 	c.options.OnDone(true)
 	c.done = true
 }
@@ -101,6 +117,7 @@ func (c *Timer) Done() bool {
 // New creates instance of timer.
 func New(options Options) *Timer {
 	return &Timer{
-		options: options,
+		options:  options,
+		clearRun: make(chan bool),
 	}
 }
