@@ -20,6 +20,7 @@ type Timer struct {
 	options  Options
 	ticker   *time.Ticker
 	started  bool
+	done     bool
 	passed   time.Duration
 	lastTick time.Time
 }
@@ -40,7 +41,7 @@ func (t Timer) timeFromLastTick() time.Duration {
 
 // Run starts just created timer and resumes paused.
 func (c *Timer) Run() {
-	//c.active = true
+	c.done = false
 	c.ticker = time.NewTicker(c.options.TickerInternal)
 	c.lastTick = time.Now()
 	if !c.started {
@@ -57,13 +58,14 @@ func (c *Timer) Run() {
 		if c.Remaining() <= 0 {
 			c.ticker.Stop()
 			c.options.OnDone(false)
+			c.done = true
 		} else if c.Remaining() <= c.options.TickerInternal {
 			c.ticker.Stop()
 			time.Sleep(c.Remaining())
 			c.passed = c.options.Duration
 			c.options.OnTick()
 			c.options.OnDone(false)
-
+			c.done = true
 		}
 	}
 }
@@ -80,6 +82,12 @@ func (c *Timer) Pause() {
 func (c *Timer) Stop() {
 	c.ticker.Stop()
 	c.options.OnDone(true)
+	c.done = true
+}
+
+// Checks if the timer is done.
+func (c *Timer) Done() bool {
+	return c.done
 }
 
 // New creates instance of timer.
