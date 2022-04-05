@@ -21,6 +21,7 @@ type Timer struct {
 	ticker   *time.Ticker
 	started  bool
 	done     bool
+	paused   bool
 	passed   time.Duration
 	lastTick time.Time
 }
@@ -42,6 +43,7 @@ func (t Timer) timeFromLastTick() time.Duration {
 // Run starts just created timer and resumes paused.
 func (c *Timer) Run() {
 	c.done = false
+	c.paused = false
 	c.ticker = time.NewTicker(c.options.TickerInternal)
 	c.lastTick = time.Now()
 	if !c.started {
@@ -75,7 +77,13 @@ func (c *Timer) Pause() {
 	c.ticker.Stop()
 	c.passed += time.Now().Sub(c.lastTick)
 	c.lastTick = time.Now()
+	c.paused = true
 	c.options.OnPaused()
+}
+
+// Paused returns whether the timer is paused or not.
+func (c *Timer) Paused() bool {
+	return c.paused
 }
 
 // Stop finishes the timer.
